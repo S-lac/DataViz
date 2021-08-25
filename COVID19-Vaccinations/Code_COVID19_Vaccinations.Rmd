@@ -1,0 +1,194 @@
+---
+title: "COVID19 - Vaccination"
+author: "Sebastien Lacube - 2021"
+date: "23/08/2021"
+output: html_document
+bibliography: references.bib  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = TRUE
+)
+
+# Utils :
+library(here)
+library(lubridate)
+
+# Plots : 
+library(plotly) # animate / interactive plotting
+library(ggplot2) # plotting library
+library(gganimate)
+
+# Data : 
+library(reshape2) # data shaping
+library(dplyr) # data wrangler
+library(tidyr) # data manipulation
+library(tidyverse)  # data manipulation
+
+```
+
+## Introduction :
+
+This markdown document has been produced with Rstudio. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+The data used for visualization can be downloaded at <https://ourworldindata.org/covid-vaccinations>. It consists of, for every country, and at several dates, the percentage of the population fully or partially vaccinated against COVID19. 
+
+The various sources of 'ourworldindata' are listed and discussed here : 
+<https://ourworldindata.org/coronavirus-source-data>
+
+The data columns used here will be : 
+
+_location_: name of the country (or region within a country).
+_iso_code_: ISO 3166-1 alpha-3 – three-letter country codes.
+_date_: date of the observation.
+_people_vaccinated_: total number of people who received at least one vaccine dose. If a person receives the first dose of a 2-dose vaccine, this metric goes up by 1. If they receive the second dose, the metric stays the same.
+_people_fully_vaccinated_: total number of people who received all doses prescribed by the vaccination protocol. If a person receives the first dose of a 2-dose vaccine, this metric stays the same. If they receive the second dose, the metric goes up by 1.
+_total_boosters_ : Total number of COVID-19 vaccination booster doses administered (doses administered beyond the number prescribed by the vaccination protocol)
+
+*BEWARE :* The data is pretty big (around 29Mb). Careful when charging it whole in your RAM. Cote d'Ivoire replaced by "Cote Ivoire" for easy redeability !
+
+```{r loading and treating data, echo=TRUE}
+
+# columns used : 
+MyColumns <- c('location','iso_code','date','people_vaccinated','people_fully_vaccinated','total_boosters','population')
+# Get file path : 
+filepath <- file.path(here(),'COVID19-Vaccinations','data','owid-covid-data.csv')
+
+# Load whole dataset : 
+covid_dataset <- read.table(filepath, 
+                  sep=",",
+                  header=TRUE,
+                  dec=".",
+                  row.names=NULL)
+
+# Subset column names we want :
+vaccines_dataset <- subset(covid_dataset,select=MyColumns)
+
+# Format all dates : 
+vaccines_dataset$formatted_dates <- ymd(vaccines_dataset$date)
+
+# Transform columns in percentage : 
+vaccines_dataset$vaccinated <- vaccines_dataset$people_vaccinated / vaccines_dataset$population * 100
+vaccines_dataset$fully_vaccinated <- vaccines_dataset$people_fully_vaccinated / vaccines_dataset$population * 100
+vaccines_dataset$unvaccinated <- 100 - vaccines_dataset$vaccinated 
+vaccines_dataset$semi_vaccinated <- vaccines_dataset$vaccinated -  vaccines_dataset$fully_vaccinated
+
+
+# Which countries : 
+European_Countries <- c('Austria'	,'Belgium','Bulgaria','Croatia'	,
+                        'Cyprus'	,'Czechia'	,'Denmark'	,
+                        'Estonia'	,'Finland'	,'France'	,
+                        'Germany'	,'Greece'	,'Hungary'	,
+                        'Ireland','Italy',
+                        'Latvia','Lithuania','Luxembourg',
+                        'Malta','Netherlands','Poland',
+                        'Portugal','Romania','Slovakia',
+                        'Slovenia','Spain','Sweden'
+                        )
+Eu_vaccines_dataset <- subset(vaccines_dataset,location %in% European_Countries )
+
+# Group per vaccination level (semi - full)
+Melted_vaccines_dataset <- melt(Eu_vaccines_dataset,
+                     measure.vars=c('semi_vaccinated',
+                                    'fully_vaccinated'),
+                     variable.name = "vaccination_level",
+                     value.name = "value"
+                     )
+
+test_dataset <- subset(vaccines_dataset,location %in% European_Countries )
+
+
+start <-  ymd("2021-01-01")
+stop <- ymd("2021-08-23")
+
+ToPlot <- subset(Melted_vaccines_dataset,
+                 formatted_dates>start & formatted_dates <stop )
+
+```
+
+```{r frozen plot, echo=FALSE, fig.height=5, fig.width=12}
+
+Test <- subset(ToPlot, date == "2021-08-01")
+ggplot(data=Test,aes(reorder(value),y=location,
+                 fill=vaccination_level,
+                 x=value,label=round(value,digits=2)
+             )
+             )+
+        geom_vline(xintercept = 100,color='black')+
+        geom_vline(xintercept = 75,color='black')+
+        geom_vline(xintercept = 50,color='black')+
+        geom_vline(xintercept = 25,color='black')+  
+        geom_bar(alpha=0.8,
+             position="stack", 
+             stat="identity")+
+        geom_text(size=2,position = position_stack() )+
+        labs(title = 'The european vaccine race | Date: 2021-08-01')+
+        theme_classic()+
+        theme(legend.position='bottom') +
+        scale_x_continuous(limits=c(0,100),expand = c(0, 0))+
+        labs(y='Countries',x='Percentage (%)')+
+        theme(axis.line = element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.text.x = element_text(size = 14),
+              plot.margin = unit(c(0.5,0.5,0.5,0.5), "cm")
+              )+
+        scale_fill_manual(name='Vaccination level',
+                          labels = c("Incomplete vaccination", 
+                                      "Fully vaccinated"), 
+                          values = c("#34eb8c", "#00AA00"))
+
+```
+
+
+```{r animated data, echo=FALSE, fig.height=30, fig.width=30}
+
+pp <- ggplot(data=ToPlot,
+             aes(y=location,
+                 fill=vaccination_level,
+                 x=value
+                 #label=paste0(round(value,digits=2),'%') 
+                 )
+             )+
+        geom_vline(xintercept = 100,color='grey')+
+        geom_vline(xintercept = 50,color='grey',linetype='dashed')+
+        geom_vline(xintercept = 70,color='red')+
+        geom_vline(xintercept = 0,color='grey')+
+        #geom_text(size=4,position = position_stack() )+
+        #geom_rect(xmin=60,xmax=70,ymin='Austria',ymax='Sweden',color='grey',alpha=0.2)+
+        geom_bar(alpha=0.8,
+             position="stack", 
+             stat="identity")+
+        transition_states(date,
+                          transition_length = 2, 
+                          state_length = 2)+
+        enter_grow()+
+        enter_fade()+
+        labs(title = 'The european vaccine race | Date: {closest_state}')+
+        theme_classic()+
+        theme(legend.position='bottom') +
+        scale_x_continuous(limits=c(0,100))+
+        labs(y='Countries',x='Percentage (%)')+
+        shadow_mark() +
+        theme(axis.line = element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.text.x = element_text(size = 14),
+              plot.margin = unit(c(0.5,0.5,0.5,0.5), "cm")
+              )+
+        scale_fill_manual(name='Vaccination level',
+                          labels = c("Incomplete vaccination", 
+                                      "Fully vaccinated"), 
+                          values = c("#a3e6a3", "#00AA00"))
+
+animate(pp, 
+        nframes = 570, 
+        duration = 25, 
+        width = 500, 
+        height = 500,
+        end_pause = 80
+        )
+
+```
+
