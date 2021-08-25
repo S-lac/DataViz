@@ -102,7 +102,7 @@ test_dataset <- subset(vaccines_dataset,location %in% European_Countries )
 
 
 start <-  ymd("2021-01-01")
-stop <- ymd("2021-08-23")
+stop <- ymd("2021-08-25")
 
 ToPlot <- subset(Melted_vaccines_dataset,
                  formatted_dates>start & formatted_dates <stop )
@@ -118,14 +118,16 @@ ggplot(data=Test,aes(reorder(value),y=location,
              )
              )+
         geom_vline(xintercept = 100,color='black')+
-        geom_vline(xintercept = 75,color='black')+
+        geom_vline(xintercept = 70,color='red')+
         geom_vline(xintercept = 50,color='black')+
-        geom_vline(xintercept = 25,color='black')+  
         geom_bar(alpha=0.8,
              position="stack", 
              stat="identity")+
+        annotate(geom = "text", x = 72, y = "Greece", label = "Hypothetical herd immunity", color = "red",
+             angle = 90)+
         geom_text(size=2,position = position_stack() )+
-        labs(title = 'The european vaccine race | Date: 2021-08-01')+
+        labs(title = 'The 2021 European Vaccine Race \n Date: 2021-08-01')+
+        labs(caption = "proudly plotted by Sebastien Lacube \n https://github.com/S-lac/DataViz")+
         theme_classic()+
         theme(legend.position='bottom') +
         scale_x_continuous(limits=c(0,100),expand = c(0, 0))+
@@ -164,9 +166,16 @@ pp <- ggplot(data=ToPlot,
         transition_states(date,
                           transition_length = 2, 
                           state_length = 2)+
+        
         enter_grow()+
         enter_fade()+
-        labs(title = 'The european vaccine race | Date: {closest_state}')+
+        labs(title = 'THE EUROPEAN VACCINE RACE \n Date: {closest_state}')+
+        annotate(geom = "text", 
+                 x = 72, 
+                 y = "Greece", 
+                 label = "Hypothetical herd immunity", 
+                 color = "red",
+             angle = 90)+
         theme_classic()+
         theme(legend.position='bottom') +
         scale_x_continuous(limits=c(0,100))+
@@ -175,19 +184,25 @@ pp <- ggplot(data=ToPlot,
         theme(axis.line = element_blank(),
               axis.ticks.y = element_blank(),
               axis.text.x = element_text(size = 14),
-              plot.margin = unit(c(0.5,0.5,0.5,0.5), "cm")
+              plot.margin = unit(c(0.5,0.5,0.5,0.5), "cm"),
+              plot.caption = element_text(hjust = 0)
               )+
         scale_fill_manual(name='Vaccination level',
                           labels = c("Incomplete vaccination", 
                                       "Fully vaccinated"), 
-                          values = c("#a3e6a3", "#00AA00"))
+                          values = c("#a3e6a3", "#00AA00"))+
+        labs(caption = "proudly plotted by Sebastien Lacube | https://github.com/S-lac/DataViz \n Source : https://ourworldindata.org/covid-vaccinations ")
 
+datapoints <- length(unique(ToPlot$date))
+endframes <- round(datapoints/4)
+time_of_animation <- 35
+        
 animate(pp, 
-        nframes = 570, 
-        duration = 25, 
+        nframes = datapoints*2+endframes, 
+        duration = time_of_animation, 
         width = 500, 
-        height = 500,
-        end_pause = 80
+        height = 600,
+        end_pause = endframes
         )
 
 ```
