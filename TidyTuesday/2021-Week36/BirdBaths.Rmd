@@ -71,7 +71,6 @@ BirdLoss <- bird_baths %>%
 ```{r Plotting, echo=FALSE, fig.height=8, fig.width=13, paged.print=TRUE}
 
 
-
 # Color theme : 
 textcolor = '#ABDBFF'
 importanttxtcolor = 'white'
@@ -162,32 +161,3 @@ ggplot(data=ToPlot,aes(x=Winter,y=bird_type,yend=bird_type,xend=Summer,color=urb
 
 ```
 
-
-```{r Plot }
-
-
-# Clustering birds in each regions by attributes : 
-# - Mean of baths between both year
-# - Difference between rural and urban areas
-Doves <- bird_baths %>% 
-  group_by(bioregions, bird_type,urban_rural,survey_year)%>%
-  # Sum similar observations
-  summarise(total_bird_count = sum(bird_count)) %>% 
-  # Overrride grouping : 
-  group_by(bioregions,urban_rural) %>%
-  # Slice the top 5 loss : 
-  # slice_max(diff_total_bird_count,n=5,with_ties = FALSE) %>%
-  # Filter only honeybeards
-  filter(grepl('Dove',bird_type))
-
-
-ggplot(data=Doves,aes(x=total_bird_count,y=bird_type,color=urban_rural))+
-  ggtitle('Variations in Dove species bathing occurence between summer and winter \nby bioregion in Australia and Area type (rural/urban).')+
-  geom_vline(xintercept = 0, color='black') +
-  geom_point(size=4)+
-  geom_segment(aes(x=0,y=bird_type,xend=diff_total_bird_count-0.25,yend=bird_type))+
-  facet_grid(urban_rural~bioregions)+
-  labs(x='Difference in absolute occurence (winter - summer)',y='Dove species')+
-  theme_bw()
-
-```
