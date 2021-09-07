@@ -1,0 +1,61 @@
+---
+title: "WorldAgriculture"
+author: "Sebastien Lacube - 2021"
+date: "31/08/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = TRUE
+)
+
+# Utils :
+library(here)
+library(lubridate)
+
+# Plots : 
+library(plotly) # animate / interactive plotting
+library(ggplot2) # plotting library
+library(gganimate)
+
+# Data : 
+library(reshape2) # data shaping
+library(dplyr) # data wrangler
+library(tidyr) # data manipulation
+library(tidyverse)  # data manipulation
+
+```
+
+## Introduction :
+
+This markdown document has been produced with Rstudio. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+The data used for visualization can be downloaded at <https://ourworldindata.org/farm-size>. It consists of, for every country, and at several dates, number of farms. Most of the data is quite old (from 1990 to 2000) because there hasn't been any estimate since.  
+
+```{r loading and treating data, echo=TRUE}
+
+# Get file path : 
+filepath <- file.path(here(),'WorldAgriculture','data','number-of-farms.csv')
+
+
+# Load whole dataset : 
+farms_dataset <- read.table(filepath, 
+                  sep=",",
+                  header=TRUE,
+                  dec=".",
+                  row.names=NULL)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
