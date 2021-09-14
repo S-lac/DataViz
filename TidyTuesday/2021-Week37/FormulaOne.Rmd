@@ -1,0 +1,249 @@
+---
+title: "Tidy Tuesday - 2021 - Week 37 - Formula One"
+author: "Sebastien Lacube"
+date: "03/09/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = TRUE
+)
+
+# Utils :
+library(tidytuesdayR)
+
+# Plots : 
+library(ggplot2) # plotting library
+library(ggExtra) # extras for platting library
+
+# Data : 
+library(tidyverse)  # data manipulation
+library(afex) # to run anova
+
+```
+
+## TidyTuesday - 2021 - Week 37 : Formula One
+
+This markdown document has been produced with Rstudio. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+The data used for visualization can be downloaded at <https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-08-31/readme.md>. The data this week comes from the Ergast API, which has a CC-BY license. H/t to Sara Stoudt for sharing the link to the data by way of Data is Plural! 
+
+Variables from the API include several tables : 
+- circuits 
+- drivers & driver standings
+- races from whole year of Formula One racing
+
+I personally added one more dataset to do the link between nationalities and country names : <https://raw.githubusercontent.com/knowitall/chunkedextractor/master/src/main/resources/edu/knowitall/chunkedextractor/demonyms.csv>
+
+
+```{r load and manipulate data }
+
+# Find correspondance between nationality & country : 
+NationalityCountry <- readr::read_csv('https://raw.githubusercontent.com/knowitall/chunkedextractor/master/src/main/resources/edu/knowitall/chunkedextractor/demonyms.csv',col_names =FALSE) 
+colnames(NationalityCountry) <- c('nationality','country') 
+AllNationalityCountry <- NationalityCountry %>%
+                            # Add the right nationalities : 
+                            add_row(nationality='Monegasque',country='Monaco')%>%
+                            add_row(nationality='East German',country='East Germany')
+  
+# Load circuit data : 
+Circuits_by_country <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/circuits.csv') %>% 
+                            rename(circuit.name=name) %>% 
+                            rename(circuit.location=location) %>% 
+                            rename(circuit.country=country) %>%
+                            select(circuitId,circuit.name,circuit.country) %>%
+                            # Properly recode countries : 
+                            mutate(circuit.country = fct_recode(circuit.country, "United States" ="USA")) %>%
+                            mutate(circuit.country = fct_recode(circuit.country, "United Kingdom" ="UK"))
+
+
+
+# Drivers data & standings : 
+drivers_by_country <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/drivers.csv') %>% 
+                          left_join(AllNationalityCountry) %>%
+                          rename(driver.country=country) %>%
+                          unite(driver.name, c("forename", "surname"),sep = ' ') %>%
+                          select(driverId,driver.name,driver.country) 
+
+constructors_by_country <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructors.csv') %>% 
+                          left_join(AllNationalityCountry) %>%
+                          rename(constructor.country=country) %>%
+                          rename(constructor.name=name) %>%
+                          select(constructorId,constructor.name,constructor.country) 
+
+# Races data : 
+races_by_country <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/races.csv') %>% 
+    inner_join(Circuits_by_country,by=c('circuitId')) %>%
+    rename(race.name=name) %>%
+    rename(race.year=year) %>%
+    rename(race.round=round) %>%
+    select(raceId,race.name,circuit.name,circuit.country,race.year,race.round) 
+
+# Driver standings : 
+driver_standings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/driver_standings.csv') %>%
+  left_join(races_by_country,by=c('raceId')) %>%
+  inner_join(drivers_by_country,by=c('driverId')) %>%
+  distinct_all() %>%
+  select(race.year,race.round,race.name,circuit.name,driver.name,points,position,wins,circuit.country,driver.country)%>%
+  mutate(IsHome =  (circuit.country == driver.country ) )
+
+
+
+# Others data : 
+# lap_times <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/lap_times.csv')
+# pit_stops <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/pit_stops.csv')
+# qualifying <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/qualifying.csv')
+# results <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/results.csv')
+# seasons <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/seasons.csv')
+# status <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/status.csv')
+
+
+```
+
+```{r drivers data analysis, fig.height=4.5, fig.width=6}
+# 
+
+ToPLot <- subset(driver_standings,!is.na(IsHome)) %>%
+  mutate(IsHomeChar = as.character(IsHome)) %>%
+  mutate(race.type = fct_recode(IsHomeChar, "Home" ="TRUE","Outside" ="FALSE"))
+
+one.way <- aov( position ~ race.type, data = ToPLot)
+summary(one.way)
+
+two.way <- aov( position ~ race.type + driver.country, data = ToPLot)
+summary(two.way)
+
+Summary <- subset(driver_standings,!is.na(IsHome)) %>%
+  mutate(IsHomeChar = as.character(IsHome)) %>%
+  mutate(race.type = fct_recode(IsHomeChar, "Home" ="TRUE","Outside" ="FALSE")) %>%
+  group_by(IsHome) %>%
+  summarise(mean=mean(position), sd=sd(position))
+
+```
+
+
+```{r constructor data analysis }
+
+
+# Driver standings : 
+constructor_standings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructor_standings.csv') %>%
+  left_join(races_by_country,by=c('raceId')) %>%
+  inner_join(constructors_by_country,by=c('constructorId')) %>%
+  distinct_all() %>%
+  select(race.year,race.round,race.name,circuit.name,constructor.name,points,position,wins,circuit.country,constructor.country)%>%
+  mutate(IsHome =  (circuit.country == constructor.country ) )
+
+
+Constructors_data <- subset(constructor_standings,!is.na(IsHome)) %>%
+  mutate(IsHomeChar = as.character(IsHome)) %>%
+  mutate(race.type = fct_recode(IsHomeChar, "Home" ="TRUE","Outside" ="FALSE")) 
+
+Constructors_by_racetype <- Constructors_data%>%
+  group_by(race.type) %>%
+  summarise(mean=mean(position), sd=sd(position),n=n())
+
+
+one.way <- aov( position ~ race.type, data = Constructors_data)
+summary(one.way)
+
+```
+
+## Data manipulation
+
+```{r driver_performances analysis, fig.height=8, fig.width=8}
+
+MyDrivers <- c('Lewis Hamilton','Fernando Alonso','Sebastian Vettel','Pierre Gasly','Sergio Pérez','Lance Stroll','George Russell','Lando Norris','Esteban Ocon','Antonio Giovinazzi','Carlos Sainz')
+
+Test <- subset(driver_standings,!is.na(IsHome)) %>%
+  mutate(IsHomeChar = as.character(IsHome)) %>%
+  mutate(race.type = fct_recode(IsHomeChar, "Home" ="TRUE","Outside" ="FALSE")) %>%
+  group_by(IsHome) %>%
+  filter(driver.name %in% MyDrivers)%>%
+  group_by(race.type,driver.name,driver.country) %>%
+  summarise(mean=mean(position), sd=sd(position),n=n())
+
+Pivoted_drivers_data <- Test %>% 
+  pivot_wider( id_cols = driver.name, names_from = race.type, values_from = mean:n)%>%
+  arrange(mean_Outside) %>%
+  mutate(driver.name=factor(driver.name, levels=driver.name))
+
+Pivoted_drivers_data$driver.name = with(Pivoted_drivers_data, reorder(driver.name, mean_Outside))
+
+
+# Theme : 
+textcolor = '#E7E6E6'
+importanttxtcolor = '#E7E6E6'
+backgroundcolor = 'black'
+intermediatecolor = '#E7E6E6'
+
+myplot <- ggplot(data=Pivoted_drivers_data)+
+  # Main aesthetics :
+  # geom_point(aes(x=mean_Home,y=driver.name),
+  #            color='#FF2800',
+  #            size=1.5)+
+  # geom_point(aes(x=mean_Outside,y=driver.name),
+  #            color='#FFC000',
+  #            size=1.5)+
+  geom_segment(aes(x=mean_Home,y=driver.name,xend=mean_Outside,yend=driver.name,color=mean_Outside-mean_Home),
+               size=1.5,
+               arrow = arrow(length = unit(0.2, "cm")),
+               lineend = 'round',
+               linejoin = 'round'
+               )+
+  geom_line(aes(x=mean_Home,y=driver.name,group=mean_Outside),
+             color='#FF2800',
+             size=3,
+            )+
+  labs(x='Average position',y='')+
+  #scale_y_discrete(position = "right")+
+  scale_colour_gradient2(low="#FFC000", high="#FF2800",mid='#4A595F',midpoint = 0,breaks=c(-2,2),labels=c('Better\n Outside','Better\n Home'),name='Preferences')+
+  theme(
+    # Axis : 
+    axis.text=element_text(size=12,color=textcolor),
+    axis.text.x = element_text(size=16,color=textcolor),
+    axis.text.y = element_text(size=16,color=textcolor),
+    axis.title.x = element_text(size=16,color=importanttxtcolor),
+    # Strips : 
+    strip.text = element_text(size = 12, colour = textcolor),
+    strip.background =element_blank(),
+    # Plot : 
+    plot.background = element_blank(),
+    plot.title = element_text(size=16,hjust = 0.5,margin = margin(t = 0, r = 0, b = 20, l = 0),color=importanttxtcolor),
+    plot.caption = element_text(hjust = -3),
+    # Legend : 
+    legend.position="bottom",
+    legend.background = element_blank(),
+    legend.key = element_rect(fill = backgroundcolor, colour = backgroundcolor),
+    legend.text = element_text(size = 12, colour = textcolor),
+    legend.title = element_text(size = 16, colour = textcolor,vjust=1),
+    # Panel : 
+    panel.spacing = unit(1, "lines"),
+    panel.background = element_rect(fill = backgroundcolor, colour = backgroundcolor),
+    panel.grid.major.x =element_blank(),
+    panel.grid.major.y =element_blank(),
+    panel.grid.minor.x =element_blank(),
+    panel.grid.minor.y =element_blank()
+  )
+
+ggsave(plot = myplot, file = "graph2.png", 
+       type = "cairo-png",  bg = "transparent",
+       width = 20, height = 14, units = "cm", dpi = 800)
+
+```
+
+
+```{r Summarize drivers data (n), echo=FALSE, fig.height=8, fig.width=13, paged.print=TRUE}
+
+subset(driver_standings,!is.na(IsHome)) %>%
+  mutate(IsHomeChar = as.character(IsHome)) %>%
+  mutate(race.type = fct_recode(IsHomeChar, "Home" ="TRUE","Outside" ="FALSE")) %>%
+  group_by(driver.name,IsHome) %>%
+  summarise(mean=mean(position), sd=sd(position),n=n())%>%
+  filter(driver.name %in% MyDrivers)
+
+```
+
