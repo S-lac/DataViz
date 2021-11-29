@@ -67,7 +67,7 @@ ui <- fluidPage(
       selectInput("chosen_specie", 
                   label = NULL,
                   choices = c('TOMATO','HEMP','SUNFLOWER','WINTER WHEAT'), 
-                  selected = 'TOMATO', 
+                  selected = 'HEMP', 
                   multiple = FALSE,
                   selectize = TRUE),
       
